@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Three substation instances for load balancing
+  substation1:
+    build: ./substation_service
+    container_name: substation1
+    ports:
+      - "5000:5000"
+    networks:
+      - smart-grid-network
+    restart: unless-stopped
+
+  substation2:
+    build: ./substation_service
+    container_name: substation2
+    ports:
+      - "5003:5000"
+    networks:
+      - smart-grid-network
+    restart: unless-stopped
+
+  substation3:
+    build: ./substation_service
+    container_name: substation3
+    ports:
+      - "5004:5000"
+    networks:
+      - smart-grid-network
+    restart: unless-stopped
+
+  # Load balancer service
+  load_balancer:
+    build: ./load_balancer
+    container_name: load_balancer
+    ports:
+      - "5002:5002"
+    networks:
+      - smart-grid-network
+    depends_on:
+      - substation1
+      - substation2
+      - substation3
+    restart: unless-stopped
+
+  # Charge request service (public API)
+  charge_request_service:
+    build: ./charge_request_service
+    container_name: charge_request_service
+    ports:
+      - "5001:5001"
+    networks:
+      - smart-grid-network
+    depends_on:
+      - load_balancer
+    restart: unless-stopped
+
+  # Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - smart-grid-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Grafana visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - smart-grid-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+networks:
+  smart-grid-network:
+    driver: bridge
+
+volumes:
+  grafana-storage:

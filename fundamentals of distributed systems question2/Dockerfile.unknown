@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install required Python packages
+RUN pip install flask requests
+
+# Copy the application code
+COPY main.py .
+
+# Expose the port
+EXPOSE 5002
+
+# Run the application
+CMD ["python", "main.py"]
